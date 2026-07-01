@@ -1,21 +1,11 @@
-# Dépendances Node
 node_modules/
-
-# Environnement
 .env
 .env.local
-
-# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 deploy.log
-
-# OS / Fichiers système
 .DS_Store
 Thumbs.db
-
-# PDF d'instructions
 *.pdf
-
