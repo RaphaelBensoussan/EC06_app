@@ -21,6 +21,7 @@ Pour ce projet, j'ai choisi la stratégie **Trunk-Based Development** (développ
 #### Conteneurisation Docker (Dockerfile)
 J'ai conçu un [Dockerfile](Dockerfile) **multistage** (en plusieurs étapes) pour séparer l'environnement de développement et de production :
 1. **Étape `builder` (Construction)** : Elle part de l'image de base légère `node:20-alpine`. Elle copie les fichiers de configuration, installe toutes les dépendances via `npm install` (y compris le linter et Jest), puis copie le code source. Elle sert à préparer le build.
+   - **Cache npm (Bonus)** : J'ai mis en place un montage de cache (`--mount=type=cache,target=/root/.npm`) pour accélérer le processus d'installation.
 2. **Étape `runner` (Production - Image finale)** : Elle repart d'une image vierge `node:20-alpine` pour plus de légèreté. Elle installe uniquement les dépendances de production (`npm install --only=production`), puis copie uniquement le code applicatif (`src`) depuis l'étape `builder`.
    - **Utilisateur non-root** : Par souci de sécurité (éviter de tourner avec les droits root), j'utilise l'instruction `USER node` pour exécuter l'application sous l'utilisateur standard fourni par l'image Alpine.
    - **Port** : L'application écoute par défaut sur le port 3000, qui est documenté avec `EXPOSE 3000`.
@@ -43,22 +44,25 @@ Voici le schéma du pipeline (flowchart Mermaid) :
 
 ```mermaid
 flowchart TD
-    A[Push / Pull Request] --> B(Job: quality)
-    B --> C{Tests & Lint OK ?}
-    C -- Non --> D[Échec du pipeline]
-    C -- Oui --> E(Job: build)
-    E --> F[Construction de l'image Docker]
-    F --> G[Scan de l'image avec Trivy]
-    G --> H{Branche main + Event push ?}
-    H -- Oui --> I[Push de l'image sur Docker Hub]
-    H -- Oui --> J(Job: deploy)
-    H -- Non --> K[Fin du pipeline]
-    J --> L[Exécution de deploy.sh]
-    L --> M[Publication de deploy.log]
+    A[Push / Pull Request] --> B(Job: lint)
+    A --> C(Job: test)
+    B --> D{Lint & Test OK ?}
+    C --> D
+    D -- Non --> E[Échec du pipeline]
+    D -- Oui --> F(Job: build)
+    F --> G[Construction de l'image Docker]
+    F --> H[Scan de l'image avec Trivy]
+    H --> I{Branche main + Event push ?}
+    I -- Oui --> J[Push de l'image sur Docker Hub]
+    I -- Oui --> K(Job: deploy)
+    I -- Non --> L[Fin du pipeline]
+    K --> M[Exécution de deploy.sh]
+    M --> N[Publication de deploy.log]
 ```
 
-- **Job `quality` (Lint + Test)** : S'exécute en premier. Il prépare le fichier d'environnement avec `cp .env.dist .env` puis lance les tests et le linter **à l'intérieur de conteneurs Docker** via `docker compose run`. Les résultats des tests Jest sont sauvegardés et publiés en tant qu'artefact de build.
-- **Job `build`** : Se lance après le succès de `quality`. Il construit l'image Docker avec un tag court (SHA) et le tag `latest`.
+- **Job `lint` (Linter) (Bonus)** : S'exécute en parallèle avec le job `test`. Il lance le linter ESLint à l'intérieur du conteneur Docker.
+- **Job `test` (Tests Jest) (Bonus)** : S'exécute en parallèle avec le job `lint`. Il prépare le fichier d'environnement avec `cp .env.dist .env` puis lance les tests Jest à l'intérieur de conteneurs Docker via `docker compose run`. Les résultats des tests Jest sont sauvegardés et publiés en tant qu'artefact de build.
+- **Job `build`** : Se lance après le succès conjoint de `lint` et `test`. Il construit l'image Docker avec un tag court (SHA) et le tag `latest`.
   - **Scan Trivy (Bonus)** : Analyse de l'image construite pour détecter les vulnérabilités de sécurité critiques et élevées avant publication.
   - **Push Docker Hub (Bonus)** : Si le build s'exécute suite à un push direct ou un merge de PR sur `main`, l'image est automatiquement poussée sur Docker Hub en utilisant des identifiants sécurisés.
 - **Job `deploy`** : Se lance après le succès de `build` uniquement sur la branche `main` après un push/merge. Il exécute le script `deploy.sh` qui simule un déploiement SSH en production et génère le fichier `deploy.log` publié comme artefact.
@@ -99,5 +103,4 @@ flowchart TD
 
 #### Limites et améliorations futures
 Certaines améliorations n'ont pas été implémentées mais sont tout à fait envisageables :
-1. **Cache des dépendances npm** : Ajouter une étape de cache dans GitHub Actions pour réutiliser les dépendances et accélérer le job de build.
-2. **Déploiement réel** : Remplacer le script `deploy.sh` simulé par un vrai script SSH utilisant `appleboy/ssh-action` pour déployer l'application sur un serveur VPS.
+1. **Déploiement réel** : Remplacer le script `deploy.sh` simulé par un vrai script SSH utilisant `appleboy/ssh-action` pour déployer l'application sur un serveur VPS.

@@ -7,8 +7,8 @@ on:
     branches: [ "**" ]
 
 jobs:
-  quality:
-    name: Qualite du code (Lint + Tests)
+  lint:
+    name: Verification de la Qualite (Linter)
     runs-on: ubuntu-latest
 
     steps:
@@ -20,6 +20,21 @@ jobs:
 
       - name: Execution du Linter dans Docker
         run: docker compose run --rm app npm run lint
+
+      - name: Arret des conteneurs
+        if: always()
+        run: docker compose down
+
+  test:
+    name: Execution des Tests Unitaires (Jest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperation du code
+        uses: actions/checkout@v4
+
+      - name: Creation du fichier .env de test
+        run: cp .env.dist .env
 
       - name: Execution des tests dans Docker
         run: docker compose run --rm app npm test | tee test-results.txt
@@ -37,7 +52,7 @@ jobs:
 
   build:
     name: Construction et Analyse de l'image
-    needs: quality
+    needs: [lint, test]
     runs-on: ubuntu-latest
 
     steps:

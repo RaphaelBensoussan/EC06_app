@@ -2,7 +2,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install
+# Cache npm pour accelerer le build (Bonus)
+RUN --mount=type=cache,target=/root/.npm npm install
 COPY . .
 
 # Stage 2 : Image finale pour la prod
@@ -10,7 +11,8 @@ FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 COPY package*.json ./
-RUN npm install --only=production
+# Cache npm pour de la production (Bonus)
+RUN --mount=type=cache,target=/root/.npm npm install --only=production
 COPY --from=builder /usr/src/app/src ./src
 
 # Securite : non-root
