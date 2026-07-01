@@ -1,0 +1,69 @@
+name: Pipeline CI-CD - EC06
+
+on:
+  push:
+    branches: [ "**" ]
+
+jobs:
+  quality:
+    name: Qualite du code (Lint + Tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperation du code
+        uses: actions/checkout@v4
+
+      - name: Creation du fichier .env de test
+        run: cp .env.dist .env
+
+      - name: Execution du Linter dans Docker
+        run: docker compose run --rm app npm run lint
+
+      - name: Execution des tests dans Docker
+        run: docker compose run --rm app npm test | tee test-results.txt
+
+      - name: Depot de l'artefact de tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.txt
+
+      - name: Arret des conteneurs
+        if: always()
+        run: docker compose down
+
+  build:
+    name: Construction de l'image Docker
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperation du code
+        uses: actions/checkout@v4
+
+      - name: Build de l'image Docker
+        run: |
+          SHA_SHORT=$(git rev-parse --short HEAD)
+          docker build -t skillhub-api:$SHA_SHORT .
+
+  deploy:
+    name: Deploiement Simule
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Recuperation du code
+        uses: actions/checkout@v4
+
+      - name: Execution du script de deploiement
+        run: |
+          chmod +x deploy.sh
+          ./deploy.sh
+
+      - name: Depot du log de deploiement
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-log
+          path: deploy.log
