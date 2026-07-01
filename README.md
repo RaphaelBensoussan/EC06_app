@@ -75,11 +75,11 @@ flowchart TD
   - Le fichier `.env` local contient des informations de configuration. Pour éviter toute fuite, ce fichier est inscrit dans [.gitignore](.gitignore) et n'est jamais poussé sur GitHub.
   - À la place, un fichier modèle [.env.dist](.env.dist) sans secrets réels est versionné pour que d'autres développeurs sachent quelles variables définir.
 - **Secrets GitHub** :
-  - Pour pousser l'image construite sur Docker Hub de manière sécurisée sans exposer mes identifiants, j'ai configuré deux secrets dans le dépôt GitHub (Settings > Secrets and variables > Actions) :
+  - Pour la connexion à Docker Hub de manière sécurisée, j'ai configuré deux secrets dans le dépôt GitHub (Settings > Secrets and variables > Actions) :
     * `DOCKER_USERNAME` : Mon nom d'utilisateur Docker Hub.
     * `DOCKER_PASSWORD` : Mon jeton d'accès (Access Token) Docker Hub.
 - **Protection de branche** :
-  - Pour empêcher qu'un développeur pousse du code non testé directement sur `main`, on applique une règle de protection de branche sur GitHub pour forcer le passage de la CI (`Qualite du code (Lint + Tests)`) avant fusion et interdire les pushs directs sur `main`.
+  - Pour empêcher qu'un développeur pousse du code non testé directement sur `main`, on applique une règle de protection de branche sur GitHub pour forcer le passage des vérifications de la CI (`Verification de la Qualite (Linter)` et `Execution des Tests Unitaires (Jest)`) avant fusion et interdire les pushs directs sur `main`.
 
 ---
 
@@ -104,3 +104,29 @@ flowchart TD
 #### Limites et améliorations futures
 Certaines améliorations n'ont pas été implémentées mais sont tout à fait envisageables :
 1. **Déploiement réel** : Remplacer le script `deploy.sh` simulé par un vrai script SSH utilisant `appleboy/ssh-action` pour déployer l'application sur un serveur VPS.
+
+---
+
+## 📸 Preuves de fonctionnement (Captures d'écran)
+
+Voici les captures d'écran démontrant le bon fonctionnement de la chaîne CI/CD et du versioning :
+
+### 1. Passage de la CI au vert sur la Pull Request
+*Capture montrant les validations des tests unitaires et du linter sur la Pull Request :*
+![CI Verte sur PR](docs/captures-ci/01-ci-verte.png)
+
+### 2. Pull Request fusionnée sur main
+*Preuve de l'intégration réussie de la branche de fonctionnalité sur la branche principale :*
+![PR Fusionnée](docs/captures-ci/02-pr-fusionnee.png)
+
+### 3. Règle de protection de la branche main
+*Configuration sur GitHub exigeant le passage de la CI et l'ouverture d'une Pull Request pour modifier main :*
+![Protection de branche](docs/captures-ci/03-protection-branche.png)
+
+### 4. Pipeline CI/CD complet vert (avec Trivy et Docker Hub)
+*Visualisation finale sous GitHub Actions montrant le succès complet de toutes les étapes (Lint + Test -> Build + Scan Trivy -> Push Docker Hub -> Deploy) :*
+![Pipeline complet vert](docs/captures-ci/04-pipeline-complet-vert.png)
+
+### 5. Bonus : Exemple de run en erreur (corrigé)
+*Preuve de l'échec initial lors du push sur Docker Hub (unauthorized / scopes) avant correction et succès :*
+![Pipeline en erreur](docs/captures-ci/01-ci-rouge-erreur.png)
